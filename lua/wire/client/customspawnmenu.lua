@@ -3,6 +3,7 @@ local PANEL = {}
 
 AccessorFunc( PANEL, "m_TabID", 			"TabID" )
 
+local enabled = CreateConVar( "wire_tool_menu_enabled", 1, {FCVAR_ARCHIVE} )
 local expand_all = CreateConVar( "wire_tool_menu_expand_all", 0, {FCVAR_ARCHIVE} )
 local separate_wire_extras = CreateConVar( "wire_tool_menu_separate_wire_extras", 1, {FCVAR_ARCHIVE} )
 local hide_duplicates = CreateConVar( "wire_tool_menu_hide_duplicates", 0, {FCVAR_ARCHIVE} )
@@ -628,22 +629,26 @@ local function setUpTabReloadOnChange( checkbox )
 end
 
 local function CreateCPanel( panel )
-	local checkbox = panel:CheckBox( "Use wire's custom tool menu for all tabs", "wire_tool_menu_custom_menu_for_all_tabs" )
-	checkbox:SetToolTip( "Requires rejoin to take effect" )
-	
-	if WireLib.WireExtrasInstalled then
-		local SeparateWireExtras = panel:CheckBox( "Separate Wire Extras", "wire_tool_menu_separate_wire_extras" )
-		SeparateWireExtras:SetToolTip( "Whether or not to separate wire extras tools into its own category." )
+	local checkbox2 = panel:CheckBox( "Use wire's custom tool menu", "wire_tool_menu_enabled" )
+	checkbox2:SetToolTip( "Requires rejoin to take effect" )
 
-		setUpTabReloadOnChange( SeparateWireExtras )
-	end
+	if enabled:GetBool() then
+		local checkbox = panel:CheckBox( "Use wire's custom tool menu for all tabs", "wire_tool_menu_custom_menu_for_all_tabs" )
+		checkbox:SetToolTip( "Requires rejoin to take effect" )
 	
-	local HideDuplicates = panel:CheckBox( "Hide tool duplicates", "wire_tool_menu_hide_duplicates" )
-	setUpTabReloadOnChange( HideDuplicates )
-	panel:Help( "It makes sense to have certain tools in multiple categories at once. However, if you don't want this, you can disable it here. The tools will then only appear in their primary category." )
+		if WireLib.WireExtrasInstalled then
+			local SeparateWireExtras = panel:CheckBox( "Separate Wire Extras", "wire_tool_menu_separate_wire_extras" )
+			SeparateWireExtras:SetToolTip( "Whether or not to separate wire extras tools into its own category." )
+
+			setUpTabReloadOnChange( SeparateWireExtras )
+		end
 	
-	local TabWidth = panel:NumSlider( "Tab width", "wire_tool_menu_tab_width", 300, 3000, 0 )
-	panel:Help( [[Set the width of all tabs.
+		local HideDuplicates = panel:CheckBox( "Hide tool duplicates", "wire_tool_menu_hide_duplicates" )
+		setUpTabReloadOnChange( HideDuplicates )
+		panel:Help( "It makes sense to have certain tools in multiple categories at once. However, if you don't want this, you can disable it here. The tools will then only appear in their primary category." )
+	
+		local TabWidth = panel:NumSlider( "Tab width", "wire_tool_menu_tab_width", 300, 3000, 0 )
+		panel:Help( [[Set the width of all tabs.
 Defaults:
 Screen width > 1600px: 548px,
 Screen width > 1280px: 460px,
@@ -652,15 +657,16 @@ Note:
 Can't be smaller than the width of any non-custom tab, and can't be greater than screenwidth * 0.6.
 Changes will take effect 3 seconds after you edit the value.]] )
 
-	function TabWidth:ValueChanged( value )
-		timer.Remove( "wire_tab_width_changed" )
-		timer.Create( "wire_tab_width_changed", 3, 1, function()
-			all_tabs[1]:GetParent():SetWide( 390 )
-			for i=1,#all_tabs do -- change the width of all registered tabs
-				all_tabs[i]:SetWidth( math.Clamp( value, 390, ScrW() * 0.6 ) )
-			end
-			all_tabs[1]:GetParent():PerformLayout()
-		end)
+		function TabWidth:ValueChanged( value )
+			timer.Remove( "wire_tab_width_changed" )
+			timer.Create( "wire_tab_width_changed", 3, 1, function()
+				all_tabs[1]:GetParent():SetWide( 390 )
+				for i=1,#all_tabs do -- change the width of all registered tabs
+					all_tabs[i]:SetWidth( math.Clamp( value, 390, ScrW() * 0.6 ) )
+				end
+				all_tabs[1]:GetParent():PerformLayout()
+			end)
+		end
 	end
 end
 
@@ -686,7 +692,7 @@ hook.Add( "PopulateToolMenu", "Wire_CustomSpawnMenu", function()
 
 	old = ToolMenu.AddToolPanel
 	function ToolMenu:AddToolPanel( Name, ToolTable )
-		if tabs[ToolTable.Name] or custom_for_all_tabs:GetBool() == true then
+		if (tabs[ToolTable.Name] or custom_for_all_tabs:GetBool() == true) && enabled:GetBool() == true then
 			local Panel = vgui.Create( "WireToolPanel" )
 			
 			if ToolTable.Name == "Wire" then
